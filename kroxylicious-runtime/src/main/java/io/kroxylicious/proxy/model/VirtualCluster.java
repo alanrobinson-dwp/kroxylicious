@@ -9,6 +9,7 @@ import java.io.UncheckedIOException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -26,6 +27,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 
 import io.kroxylicious.proxy.config.IllegalConfigurationException;
+import io.kroxylicious.proxy.config.NamedFilterDefinition;
 import io.kroxylicious.proxy.config.TargetCluster;
 import io.kroxylicious.proxy.config.tls.AllowDeny;
 import io.kroxylicious.proxy.config.tls.NettyKeyProvider;
@@ -54,6 +56,8 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
 
     private final ClusterNetworkAddressConfigProvider clusterNetworkAddressConfigProvider;
 
+    private final List<NamedFilterDefinition> filters;
+
     private final Optional<SslContext> upstreamSslContext;
 
     private final Optional<SslContext> downstreamSslContext;
@@ -66,12 +70,23 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
                           Optional<Tls> tls,
                           boolean logNetwork,
                           boolean logFrames) {
+        this(clusterName, targetCluster, clusterNetworkAddressConfigProvider, tls, logNetwork, logFrames, List.of());
+    }
+
+    public VirtualCluster(String clusterName,
+                          TargetCluster targetCluster,
+                          ClusterNetworkAddressConfigProvider clusterNetworkAddressConfigProvider,
+                          Optional<Tls> tls,
+                          boolean logNetwork,
+                          boolean logFrames,
+                          @NonNull List<NamedFilterDefinition> filters) {
         this.clusterName = clusterName;
         this.tls = tls;
         this.targetCluster = targetCluster;
         this.logNetwork = logNetwork;
         this.logFrames = logFrames;
         this.clusterNetworkAddressConfigProvider = clusterNetworkAddressConfigProvider;
+        this.filters = filters;
 
         validateTLsSettings(clusterNetworkAddressConfigProvider, tls);
         validatePortUsage(clusterNetworkAddressConfigProvider);
@@ -295,6 +310,16 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
             }
         });
     }
+
+    private static SSLParameters getDefaultSSLParameters() {
+        try {
+            return SSLContext.getDefault().getDefaultSSLParameters();
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
+  
     private static void validatePortUsage(ClusterNetworkAddressConfigProvider clusterNetworkAddressConfigProvider) {
         var conflicts = clusterNetworkAddressConfigProvider.getExclusivePorts().stream().filter(p -> clusterNetworkAddressConfigProvider.getSharedPorts().contains(p))
                 .collect(Collectors.toSet());
@@ -309,13 +334,8 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
             throw new IllegalStateException("Cluster endpoint provider requires server TLS, but this virtual cluster does not define it.");
         }
     }
-
-    private static SSLParameters getDefaultSSLParameters() {
-        try {
-            return SSLContext.getDefault().getDefaultSSLParameters();
-        }
-        catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
+  
+    public @NonNull List<NamedFilterDefinition> getFilters() {
+        return filters;
     }
 }
