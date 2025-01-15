@@ -271,15 +271,14 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
     private static void configureEnabledProtocols(SslContextBuilder sslContextBuilder, Tls tlsConfiguration) {
         var protocols = Optional.ofNullable(tlsConfiguration.protocols());
 
-        if (protocols.isPresent()) {
-            var allowedProtocols = Optional.ofNullable(protocols.get().allowed())
+        protocols.ifPresent(allowDeny -> {
+            var allowedProtocols = protocols.map(AllowDeny::allowed)
                     .orElse(Arrays.stream(getDefaultSSLParameters().getProtocols())
                             .map(TlsProtocol::getProtocolName)
                             .filter(Optional::isPresent)
                             .map(Optional::get)
                             .toList());
-            var deniedProtocols = Optional.ofNullable(protocols.get().denied())
-                    .orElse(Set.of());
+            var deniedProtocols = protocols.map(AllowDeny::denied).orElse(Set.of());
 
             var protocolsToUse = allowedProtocols.stream()
                     .filter(Predicate.not(deniedProtocols::contains))
@@ -290,13 +289,12 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
                 sslContextBuilder.protocols(protocolsToUse);
             }
             else {
-                throw new IllegalStateException(
+                throw new IllegalConfigurationException(
                         "The protocols configuration you have in place has resulted in no protocols being set. Allowed: " + allowedProtocols + ", Denied: "
                                 + deniedProtocols);
             }
-        }
+        });
     }
-
     private static void validatePortUsage(ClusterNetworkAddressConfigProvider clusterNetworkAddressConfigProvider) {
         var conflicts = clusterNetworkAddressConfigProvider.getExclusivePorts().stream().filter(p -> clusterNetworkAddressConfigProvider.getSharedPorts().contains(p))
                 .collect(Collectors.toSet());
