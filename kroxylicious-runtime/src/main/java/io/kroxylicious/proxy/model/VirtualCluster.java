@@ -319,7 +319,7 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
             throw new RuntimeException(e);
         }
     }
-  
+
     private static void validatePortUsage(ClusterNetworkAddressConfigProvider clusterNetworkAddressConfigProvider) {
         var conflicts = clusterNetworkAddressConfigProvider.getExclusivePorts().stream().filter(p -> clusterNetworkAddressConfigProvider.getSharedPorts().contains(p))
                 .collect(Collectors.toSet());
@@ -334,7 +334,7 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
             throw new IllegalStateException("Cluster endpoint provider requires server TLS, but this virtual cluster does not define it.");
         }
     }
-  
+
     public @NonNull List<NamedFilterDefinition> getFilters() {
         return filters;
     }

@@ -31,14 +31,11 @@ import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLSession;
 
 import org.apache.kafka.clients.CommonClientConfigs;
-import org.apache.kafka.clients.NodeApiVersions;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.DescribeClusterOptions;
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.errors.TimeoutException;
-import org.apache.kafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.security.auth.SecurityProtocol;
-import org.assertj.core.api.Condition;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,7 +69,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import static io.kroxylicious.test.tester.KroxyliciousTesters.kroxyliciousTester;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.InstanceOfAssertFactories.list;
 
 /**
  * Integration tests focused on Kroxylicious ability to use TLS for both the upstream and downstream.
