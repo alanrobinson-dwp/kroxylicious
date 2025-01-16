@@ -34,7 +34,6 @@ import io.kroxylicious.proxy.config.tls.NettyKeyProvider;
 import io.kroxylicious.proxy.config.tls.NettyTrustProvider;
 import io.kroxylicious.proxy.config.tls.PlatformTrustProvider;
 import io.kroxylicious.proxy.config.tls.Tls;
-import io.kroxylicious.proxy.config.tls.TlsProtocol;
 import io.kroxylicious.proxy.config.tls.TrustOptions;
 import io.kroxylicious.proxy.config.tls.TrustProvider;
 import io.kroxylicious.proxy.service.ClusterNetworkAddressConfigProvider;
@@ -285,19 +284,27 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
 
     private static void configureEnabledProtocols(SslContextBuilder sslContextBuilder, Tls tlsConfiguration) {
         var protocols = Optional.ofNullable(tlsConfiguration.protocols());
+        var defaultProtocols = Arrays.stream(getDefaultSSLParameters().getProtocols()).toList();
+        var supportedProtocols = Arrays.stream(getSupportedSSLParameters().getProtocols()).toList();
 
         protocols.ifPresent(allowDeny -> {
-            var allowedProtocols = protocols.map(AllowDeny::allowed)
-                    .orElse(Arrays.stream(getDefaultSSLParameters().getProtocols())
-                            .map(TlsProtocol::getProtocolName)
-                            .filter(Optional::isPresent)
-                            .map(Optional::get)
-                            .toList());
+            var allowedProtocols = protocols.map(AllowDeny::allowed).orElse(defaultProtocols);
+
             var deniedProtocols = protocols.map(AllowDeny::denied).orElse(Set.of());
 
+            allowedProtocols.stream()
+                    .filter(Predicate.not(supportedProtocols::contains))
+                    .forEach(unsupportedProtocol -> LOGGER.warn("Ignoring allowed protocol '{}' as it is not recognized by this platform (supported protocols: {})",
+                            unsupportedProtocol, supportedProtocols));
+
+            deniedProtocols.stream()
+                    .filter(Predicate.not(supportedProtocols::contains))
+                    .forEach(unsupportedProtocol -> LOGGER.warn("Ignoring denied protocol '{}' as it is not recognized by this platform (supported protocols: {})",
+                            unsupportedProtocol, supportedProtocols));
+
             var protocolsToUse = allowedProtocols.stream()
+                    .filter(supportedProtocols::contains)
                     .filter(Predicate.not(deniedProtocols::contains))
-                    .map(TlsProtocol::getTlsProtocol)
                     .toList();
 
             if (!protocolsToUse.isEmpty()) {
@@ -314,6 +321,15 @@ public class VirtualCluster implements ClusterNetworkAddressConfigProvider {
     private static SSLParameters getDefaultSSLParameters() {
         try {
             return SSLContext.getDefault().getDefaultSSLParameters();
+        }
+        catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static SSLParameters getSupportedSSLParameters() {
+        try {
+            return SSLContext.getDefault().getSupportedSSLParameters();
         }
         catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);

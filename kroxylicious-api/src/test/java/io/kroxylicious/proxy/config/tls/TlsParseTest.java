@@ -468,7 +468,7 @@ class TlsParseTest {
         assertThat(tls).isEqualTo(new Tls(
                 null,
                 null,
-                new AllowDeny<String>(
+                new AllowDeny<>(
                         List.of("ALLOWED_CIPHER_SUITE_1", "ALLOWED_CIPHER_SUITE_2", "ALLOWED_CIPHER_SUITE_3"),
                         Set.of("DENIED_CIPHER_SUITE_1", "DENIED_CIPHER_SUITE_2", "DENIED_CIPHER_SUITE_3")),
                 null));
@@ -480,11 +480,11 @@ class TlsParseTest {
                 {
                     "protocols": {
                         "allowed": [
-                            "TLS_V_1_2",
-                            "TLS_V_1_3"
+                            "TLSv1.2",
+                            "TLSv1.3"
                         ],
                         "denied": [
-                            "TLS_V_1_1"
+                            "TLSv1.1"
                         ]
                     }
                 }
@@ -494,9 +494,9 @@ class TlsParseTest {
                 null,
                 null,
                 null,
-                new AllowDeny<TlsProtocol>(
-                        List.of(TlsProtocol.TLS_V_1_2, TlsProtocol.TLS_V_1_3),
-                        Set.of(TlsProtocol.TLS_V_1_1))));
+                new AllowDeny<>(
+                        List.of("TLSv1.2", "TLSv1.3"),
+                        Set.of("TLSv1.1"))));
     }
 
     private Tls readTls(String json) throws IOException {

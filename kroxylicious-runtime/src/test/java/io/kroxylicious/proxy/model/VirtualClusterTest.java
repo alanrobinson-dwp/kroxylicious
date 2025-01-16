@@ -33,7 +33,6 @@ import io.kroxylicious.proxy.config.tls.KeyPair;
 import io.kroxylicious.proxy.config.tls.ServerOptions;
 import io.kroxylicious.proxy.config.tls.Tls;
 import io.kroxylicious.proxy.config.tls.TlsClientAuth;
-import io.kroxylicious.proxy.config.tls.TlsProtocol;
 import io.kroxylicious.proxy.config.tls.TlsTestConstants;
 import io.kroxylicious.proxy.config.tls.TrustStore;
 import io.kroxylicious.proxy.internal.clusternetworkaddressconfigprovider.PortPerBrokerClusterNetworkAddressConfigProvider;
@@ -162,16 +161,16 @@ class VirtualClusterTest {
     static Stream<Arguments> protocolRestrictions() {
         return Stream.of(
                 argumentSet("allow single protocol",
-                        new AllowDeny<>(List.of(TlsProtocol.TLS_V_1_3), null),
+                        new AllowDeny<>(List.of("TLSv1.3"), null),
                         (Consumer<SSLEngine>) (SSLEngine sslEngine) -> assertThat(sslEngine.getEnabledProtocols()).containsExactly("TLSv1.3")),
                 argumentSet("deny single protocol",
-                        new AllowDeny<>(null, Set.of(TlsProtocol.TLS_V_1_2)),
+                        new AllowDeny<>(null, Set.of("TLSv1.2")),
                         (Consumer<SSLEngine>) (SSLEngine sslEngine) -> assertThat(sslEngine.getEnabledProtocols()).doesNotContain("TLSv1.2")));
     }
 
     @ParameterizedTest
     @MethodSource("protocolRestrictions")
-    void shouldApplyDownstreamProtocolRestriction(AllowDeny<TlsProtocol> protocolAllowDeny, Consumer<SSLEngine> sslEngineAssertions) {
+    void shouldApplyDownstreamProtocolRestriction(AllowDeny<String> protocolAllowDeny, Consumer<SSLEngine> sslEngineAssertions) {
         // Given
         final Optional<Tls> tls = Optional.of(new Tls(keyPair, new TrustStore(client, PASSWORD_PROVIDER, null, null), null, protocolAllowDeny));
         final ClusterNetworkAddressConfigProvider clusterNetworkAddressConfigProvider = createTestClusterNetworkAddressConfigProvider();

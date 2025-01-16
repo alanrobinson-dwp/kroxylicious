@@ -53,7 +53,6 @@ import io.kroxylicious.proxy.config.secret.InlinePassword;
 import io.kroxylicious.proxy.config.secret.PasswordProvider;
 import io.kroxylicious.proxy.config.tls.AllowDeny;
 import io.kroxylicious.proxy.config.tls.TlsClientAuth;
-import io.kroxylicious.proxy.config.tls.TlsProtocol;
 import io.kroxylicious.proxy.internal.clusternetworkaddressconfigprovider.PortPerBrokerClusterNetworkAddressConfigProvider;
 import io.kroxylicious.proxy.service.HostPort;
 import io.kroxylicious.testing.kafka.api.KafkaCluster;
@@ -363,7 +362,7 @@ class TlsIT extends BaseIT {
         var bootstrapServers = cluster.getBootstrapServers();
 
         // Protocol we want to use
-        AllowDeny<TlsProtocol> protocols = new AllowDeny<>(List.of(TlsProtocol.TLS_V_1_2), null);
+        AllowDeny<String> protocols = new AllowDeny<>(List.of("TLSv1.2"), null);
 
         var builder = new ConfigurationBuilder()
                 .addToVirtualClusters("demo", new VirtualClusterBuilder()
@@ -387,7 +386,7 @@ class TlsIT extends BaseIT {
                                 SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, clientTrustStore.toAbsolutePath().toString(),
                                 SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, downstreamCertificateGenerator.getPassword(),
                                 // Accepted Protocol matches what we want to use
-                                SslConfigs.SSL_ENABLED_PROTOCOLS_CONFIG, TlsProtocol.TLS_V_1_2.getTlsProtocol()))) {
+                                SslConfigs.SSL_ENABLED_PROTOCOLS_CONFIG, "TLSv1.2"))) {
 
             // do some work to ensure connection is opened
             final CreateTopicsResult createTopicsResult = createTopic(admin, TOPIC, 1);
@@ -416,7 +415,7 @@ class TlsIT extends BaseIT {
         var bootstrapServers = cluster.getBootstrapServers();
 
         // Protocol we want to use
-        AllowDeny<TlsProtocol> protocols = new AllowDeny<>(List.of(TlsProtocol.TLS_V_1_2), null);
+        AllowDeny<String> protocols = new AllowDeny<>(List.of("TLSv1.2"), null);
 
         var builder = new ConfigurationBuilder()
                 .addToVirtualClusters("demo", new VirtualClusterBuilder()
@@ -440,7 +439,7 @@ class TlsIT extends BaseIT {
                                 SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, clientTrustStore.toAbsolutePath().toString(),
                                 SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, downstreamCertificateGenerator.getPassword(),
                                 // Accepted Protocol doesn't match what we want to use
-                                SslConfigs.SSL_ENABLED_PROTOCOLS_CONFIG, TlsProtocol.TLS_V_1_3.getTlsProtocol()))) {
+                                SslConfigs.SSL_ENABLED_PROTOCOLS_CONFIG, "TLSv1.3"))) {
             // Server will only allow us to use TLSv1.3
             assertThatThrownBy(() -> admin.describeCluster().clusterId().get(10, TimeUnit.SECONDS)).hasRootCauseInstanceOf(SSLHandshakeException.class)
                     .hasRootCauseMessage("Received fatal alert: protocol_version");
@@ -452,7 +451,7 @@ class TlsIT extends BaseIT {
         var bootstrapServers = cluster.getBootstrapServers();
 
         // Protocol we want to use
-        AllowDeny<TlsProtocol> protocols = new AllowDeny<>(null, Set.of(TlsProtocol.TLS_V_1_2));
+        AllowDeny<String> protocols = new AllowDeny<>(null, Set.of("TLSv1.2"));
 
         var builder = new ConfigurationBuilder()
                 .addToVirtualClusters("demo", new VirtualClusterBuilder()
@@ -476,7 +475,7 @@ class TlsIT extends BaseIT {
                                 SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, clientTrustStore.toAbsolutePath().toString(),
                                 SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, downstreamCertificateGenerator.getPassword(),
                                 // Accepted Protocol matches what we want to use even with a denied protocol
-                                SslConfigs.SSL_ENABLED_PROTOCOLS_CONFIG, TlsProtocol.TLS_V_1_2.getTlsProtocol() + "," + TlsProtocol.TLS_V_1_3.getTlsProtocol()))) {
+                                SslConfigs.SSL_ENABLED_PROTOCOLS_CONFIG, "TLSv1.2, TLSv1.3"))) {
             // do some work to ensure connection is opened
             final CreateTopicsResult createTopicsResult = createTopic(admin, TOPIC, 1);
             assertThat(createTopicsResult.all()).isDone();
@@ -494,7 +493,7 @@ class TlsIT extends BaseIT {
         var brokerTrustPasswordProvider = constructPasswordProvider(InlinePassword.class, brokerTruststorePassword);
 
         // Protocol we want to use
-        AllowDeny<TlsProtocol> protocols = new AllowDeny<>(List.of(TlsProtocol.TLS_V_1_2), null);
+        AllowDeny<String> protocols = new AllowDeny<>(List.of("TLSv1.2"), null);
 
         var builder = new ConfigurationBuilder()
                 .addToVirtualClusters("demo", new VirtualClusterBuilder()
@@ -530,7 +529,7 @@ class TlsIT extends BaseIT {
         var brokerTrustPasswordProvider = constructPasswordProvider(InlinePassword.class, brokerTruststorePassword);
 
         // Protocol we want to use
-        AllowDeny<TlsProtocol> protocols = new AllowDeny<>(List.of(TlsProtocol.TLS_V_1_1), null);
+        AllowDeny<String> protocols = new AllowDeny<>(List.of("TLSv1.1"), null);
 
         var builder = new ConfigurationBuilder()
                 .addToVirtualClusters("demo", new VirtualClusterBuilder()
@@ -592,6 +591,22 @@ class TlsIT extends BaseIT {
             // do some work to ensure connection is opened
             final CreateTopicsResult createTopicsResult = createTopic(admin, TOPIC, 1);
             assertThat(createTopicsResult.all()).isDone();
+
+            // verify that the admin is actually using the intended cipher
+            assertThat(admin)
+                    .extracting("instance")
+                    .extracting("client")
+                    .extracting("selector")
+                    .extracting("channels", InstanceOfAssertFactories.map(String.class, Object.class))
+                    .anySatisfy((id, channel) -> {
+                        assertThat(channel)
+                                .extracting("transportLayer")
+                                .extracting("sslEngine", InstanceOfAssertFactories.type(SSLEngine.class))
+                                .extracting(SSLEngine::getSession)
+                                .extracting(SSLSession::getCipherSuite)
+                                .isEqualTo("TLS_CHACHA20_POLY1305_SHA256");
+                    });
+
         }
     }
 
